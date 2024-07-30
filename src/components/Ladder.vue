@@ -1,15 +1,35 @@
 <template>
   <v-container>
     <v-data-table
-      :headers="headers"
-      :items="results"
-      :items-per-page="10"
-      class="elevation-1"
+        :headers="filteredHeaders"
+        :items="results"
+        :items-per-page="10"
+        :sort-by="['avg_score']"
+        :sort-desc="[true]"
+        class="elevation-1"
     >
       <template v-slot:top>
         <v-toolbar flat>
           <v-toolbar-title>RL Algorithm Ladder</v-toolbar-title>
         </v-toolbar>
+      </template>
+      <template v-slot:item.avatar="{ item }">
+        <a :href="item.html_url" target="_blank" rel="noopener noreferrer">
+          <v-avatar size="40">
+            <v-img :src="item.avatar_url" :alt="item.name"></v-img>
+          </v-avatar>
+        </a>
+      </template>
+      <template v-slot:item.name="{ item }">
+        <a :href="item.html_url" target="_blank" rel="noopener noreferrer">
+          {{ item.name }}
+        </a>
+      </template>
+      <template v-slot:item.created_at="{ item }">
+        {{ formatDate(item.created_at) }}
+      </template>
+      <template v-slot:item.avg_score="{ item }">
+        {{ item.avg_score.toFixed(2) }}
       </template>
       <template v-slot:item.actions="{ item }">
         <v-btn small @click="showDetails(item)">Details</v-btn>
@@ -22,10 +42,10 @@
           <v-simple-table>
             <template v-slot:default>
               <tbody>
-                <tr v-for="(value, key) in selectedItem" :key="key">
-                  <td>{{ key }}</td>
-                  <td>{{ value }}</td>
-                </tr>
+              <tr v-for="(value, key) in selectedItem" :key="key">
+                <td>{{ key }}</td>
+                <td>{{ value }}</td>
+              </tr>
               </tbody>
             </template>
           </v-simple-table>
@@ -45,44 +65,107 @@ import axios from 'axios';
 export default {
   data: () => ({
     headers: [
+      { text: 'Avatar', value: 'avatar', sortable: false },
       { text: 'Name', value: 'name' },
-      { text: 'Algorithm', value: 'algo' },
+      { text: 'Algorithm', value: 'algorithm' },
+      { text: 'Avg Score', value: 'avg_score' },
       { text: 'Pong', value: 'Pong' },
       { text: 'Breakout', value: 'Breakout' },
       { text: 'SpaceInvaders', value: 'SpaceInvaders' },
+      { text: 'Submitted At', value: 'created_at' },
       { text: 'Actions', value: 'actions', sortable: false },
     ],
     results: [],
     dialog: false,
     selectedItem: null,
   }),
+  computed: {
+    filteredHeaders() {
+      return this.headers.filter(header => {
+        if (['avatar', 'name', 'algorithm', 'avg_score', 'created_at', 'actions'].includes(header.value)) {
+          return true;
+        }
+        return this.results.some(result => result[header.value] !== '');
+      });
+    },
+  },
   mounted() {
     this.fetchResults();
   },
   methods: {
     async fetchResults() {
       try {
-        const response = await axios.get('https://api.github.com/repos/justbechit/rl_ladder/issues?labels=benchmark');
+        const response = await axios.get('https://api.github.com/repos/justbechit/rl_ladder.github.io/issues?labels=benchmark');
         this.results = response.data.map(issue => this.parseIssue(issue));
       } catch (error) {
         console.error('Error fetching results:', error);
       }
     },
     parseIssue(issue) {
+      const result = {
+        name: issue.user.login,
+        avatar_url: issue.user.avatar_url,
+        html_url: issue.user.html_url,
+        algorithm: '',
+        Pong: '',
+        Breakout: '',
+        SpaceInvaders: '',
+        Pretrained: '',
+        TrainEpisodes: '',
+        EvalEpisodes: '',
+        Comment: '',
+        created_at: issue.created_at
+      };
+
       const lines = issue.body.split('\n');
-      const result = {};
       lines.forEach(line => {
-        const [key, value] = line.split(':').map(s => s.trim());
-        if (key && value) {
-          result[key] = value;
+        line = line.trim();
+        if (line.startsWith('Algorithm:')) {
+          result.algorithm = line.split(':')[1].trim();
+        } else if (line.startsWith('Pretrained:')) {
+          result.Pretrained = line.split(':')[1].trim();
+        } else if (line.startsWith('Train episodes:')) {
+          result.TrainEpisodes = line.split(':')[1].trim();
+        } else if (line.startsWith('Eval episodes:')) {
+          result.EvalEpisodes = line.split(':')[1].trim();
+        } else if (line.startsWith('Comment:')) {
+          result.Comment = line.split(':')[1].trim();
+        } else {
+          const [key, value] = line.split(':').map(s => s.trim());
+          if (key && value && result.hasOwnProperty(key)) {
+            result[key] = value;
+          }
         }
       });
+
+      // Remove leading dash if present
+      for (let key in result) {
+        if (typeof result[key] === 'string' && result[key].startsWith('- ')) {
+          result[key] = result[key].substring(2);
+        }
+      }
+
+      // Calculate average score
+      const scores = ['Pong', 'Breakout', 'SpaceInvaders'].map(game => parseFloat(result[game]));
+      result.avg_score = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+
       return result;
     },
     showDetails(item) {
       this.selectedItem = item;
       this.dialog = true;
     },
+    formatDate(dateString) {
+      const options = {year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'};
+      return new Date(dateString).toLocaleDateString('en-US', options);
+    },
   },
 };
 </script>
+
+<style scoped>
+a {
+  text-decoration: none;
+  color: inherit;
+}
+</style>
