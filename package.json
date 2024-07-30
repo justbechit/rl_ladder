@@ -1,6 +1,7 @@
 {
   "name": "rl-ladder",
   "version": "0.1.0",
+  "type": "module",
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve  --no-eslint",
@@ -8,6 +9,7 @@
     "predeploy": "npm run build"
   },
   "dependencies": {
+    "@octokit/rest": "^21.0.1",
     "axios": "^0.21.1",
     "core-js": "^3.6.5",
     "vue": "^2.6.11",

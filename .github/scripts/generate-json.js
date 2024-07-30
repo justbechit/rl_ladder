@@ -1,5 +1,5 @@
-const { Octokit } = require("@octokit/rest");
-const fs = require('fs');
+import { Octokit } from "@octokit/rest";
+import fs from 'fs/promises';
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 
@@ -75,7 +75,7 @@ function parseIssue(issue) {
 async function main() {
   const issues = await fetchIssues();
   const parsedIssues = issues.map(parseIssue);
-  fs.writeFileSync('ladder_data.json', JSON.stringify(parsedIssues, null, 2));
+  await fs.writeFile('ladder_data.json', JSON.stringify(parsedIssues, null, 2));
 }
 
 main().catch(error => {
