@@ -1,7 +1,13 @@
 import { Octokit } from "@octokit/rest";
+import fetch from 'node-fetch';
 import fs from 'fs/promises';
 
-const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+const octokit = new Octokit({
+  auth: process.env.GITHUB_TOKEN,
+  request: {
+    fetch: fetch
+  }
+});
 
 async function fetchIssues() {
   const issues = await octokit.issues.listForRepo({
@@ -73,12 +79,15 @@ function parseIssue(issue) {
 }
 
 async function main() {
-  const issues = await fetchIssues();
-  const parsedIssues = issues.map(parseIssue);
-  await fs.writeFile('ladder_data.json', JSON.stringify(parsedIssues, null, 2));
+  try {
+    const issues = await fetchIssues();
+    const parsedIssues = issues.map(parseIssue);
+    await fs.writeFile('ladder_data.json', JSON.stringify(parsedIssues, null, 2));
+    console.log('JSON file generated successfully');
+  } catch (error) {
+    console.error('Error generating JSON file:', error);
+    process.exit(1);
+  }
 }
 
-main().catch(error => {
-  console.error(error);
-  process.exit(1);
-});
+main();
