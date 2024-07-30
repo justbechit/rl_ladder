@@ -60,6 +60,8 @@
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   data: () => ({
     headers: [
@@ -86,6 +88,9 @@ export default {
         return this.results.some(result => result[header.value] !== '');
       });
     },
+    isDevelopment() {
+      return process.env.NODE_ENV === 'development';
+    },
   },
   mounted() {
     this.fetchResults();
@@ -93,11 +98,66 @@ export default {
   methods: {
     async fetchResults() {
       try {
-        const response = await fetch('/ladder_data.json');
-        this.results = await response.json();
+        if (this.isDevelopment) {
+          const response = await axios.get('https://api.github.com/repos/justbechit/rl_ladder.github.io/issues?labels=benchmark');
+          this.results = response.data.map(issue => this.parseIssue(issue));
+        } else {
+          const response = await fetch('/ladder_data.json');
+          this.results = await response.json();
+        }
       } catch (error) {
         console.error('Error fetching results:', error);
       }
+    },
+    parseIssue(issue) {
+      const result = {
+        name: issue.user.login,
+        avatar_url: issue.user.avatar_url,
+        html_url: issue.user.html_url,
+        algorithm: '',
+        Pong: '',
+        Breakout: '',
+        SpaceInvaders: '',
+        Pretrained: '',
+        TrainEpisodes: '',
+        EvalEpisodes: '',
+        Comment: '',
+        created_at: issue.created_at
+      };
+
+      const lines = issue.body.split('\n');
+      lines.forEach(line => {
+        line = line.trim();
+        if (line.startsWith('Algorithm:')) {
+          result.algorithm = line.split(':')[1].trim();
+        } else if (line.startsWith('Pretrained:')) {
+          result.Pretrained = line.split(':')[1].trim();
+        } else if (line.startsWith('Train episodes:')) {
+          result.TrainEpisodes = line.split(':')[1].trim();
+        } else if (line.startsWith('Eval episodes:')) {
+          result.EvalEpisodes = line.split(':')[1].trim();
+        } else if (line.startsWith('Comment:')) {
+          result.Comment = line.split(':')[1].trim();
+        } else {
+          const [key, value] = line.split(':').map(s => s.trim());
+          if (key && value && result.hasOwnProperty(key)) {
+            result[key] = value;
+          }
+        }
+      });
+
+      // Remove leading dash if present
+      for (let key in result) {
+        if (typeof result[key] === 'string' && result[key].startsWith('- ')) {
+          result[key] = result[key].substring(2);
+        }
+      }
+
+      // Calculate average score
+      const scores = ['Pong', 'Breakout', 'SpaceInvaders'].map(game => parseFloat(result[game]));
+      result.avg_score = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+
+      return result;
     },
     showDetails(item) {
       this.selectedItem = item;
