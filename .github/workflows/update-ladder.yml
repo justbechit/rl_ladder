@@ -25,7 +25,7 @@ jobs:
       - name: Generate JSON data
         run: |
           npm install @octokit/rest node-fetch@2
-          node .github/scripts/generate-json.js
+          node .github/scripts/generate-json.mjs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
