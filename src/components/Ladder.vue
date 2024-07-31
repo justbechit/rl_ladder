@@ -102,7 +102,8 @@ export default {
           const response = await axios.get('https://api.github.com/repos/justbechit/rl_ladder/issues?labels=benchmark');
           this.results = response.data.map(issue => this.parseIssue(issue));
         } else {
-          const response = await fetch(this.baseUrl + 'ladder_data.json');
+          console.log('Current baseUrl:', this.baseUrl); // 添加这行来调试
+          const response = await fetch('ladder_data.json');
           this.results = await response.json();
         }
       } catch (error) {
