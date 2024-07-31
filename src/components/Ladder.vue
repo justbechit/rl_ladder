@@ -29,7 +29,7 @@
         {{ formatDate(item.created_at) }}
       </template>
       <template v-slot:item.avg_score="{ item }">
-        {{ item.avg_score.toFixed(2) }}
+        {{ item.avg_score != null ? item.avg_score.toFixed(2) : 'N/A' }}
       </template>
       <template v-slot:item.actions="{ item }">
         <v-btn small @click="showDetails(item)">Details</v-btn>
@@ -78,6 +78,7 @@ export default {
     results: [],
     dialog: false,
     selectedItem: null,
+    baseUrl: process.env.NODE_ENV === 'production' ? '/rl_ladder/' : '/',
   }),
   computed: {
     filteredHeaders() {
@@ -98,14 +99,21 @@ export default {
   methods: {
     async fetchResults() {
       try {
+        console.log('Fetching results...');
         if (this.isDevelopment) {
           const response = await axios.get('https://api.github.com/repos/justbechit/rl_ladder/issues?labels=benchmark');
           this.results = response.data.map(issue => this.parseIssue(issue));
         } else {
-          console.log('Current baseUrl:', this.baseUrl); // 添加这行来调试
-          const response = await fetch('ladder_data.json');
+          const url = this.baseUrl + 'ladder_data.json';
+          console.log('Fetching from URL:', url);
+          console.log('this.baseUrl', this.baseUrl);
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
           this.results = await response.json();
         }
+        console.log('Fetched results:', this.results);
       } catch (error) {
         console.error('Error fetching results:', error);
       }
@@ -155,8 +163,12 @@ export default {
       }
 
       // Calculate average score
-      const scores = ['Pong', 'Breakout', 'SpaceInvaders'].map(game => parseFloat(result[game]));
-      result.avg_score = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+      const scores = ['Pong', 'Breakout', 'SpaceInvaders']
+          .map(game => parseFloat(result[game]))
+          .filter(score => !isNaN(score));
+      result.avg_score = scores.length > 0
+          ? scores.reduce((sum, score) => sum + score, 0) / scores.length
+          : null;
 
       return result;
     },
