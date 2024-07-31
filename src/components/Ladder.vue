@@ -99,10 +99,10 @@ export default {
     async fetchResults() {
       try {
         if (this.isDevelopment) {
-          const response = await axios.get('https://api.github.com/repos/justbechit/rl_ladder.github.io/issues?labels=benchmark');
+          const response = await axios.get('https://api.github.com/repos/justbechit/rl_ladder/issues?labels=benchmark');
           this.results = response.data.map(issue => this.parseIssue(issue));
         } else {
-          const response = await fetch('/ladder_data.json');
+          const response = await fetch(this.baseUrl + 'ladder_data.json');
           this.results = await response.json();
         }
       } catch (error) {
