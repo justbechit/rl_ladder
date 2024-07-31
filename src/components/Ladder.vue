@@ -123,19 +123,20 @@ export default {
     async fetchResults() {
       try {
         console.log('Fetching results...');
+        let data;
         if (this.isDevelopment) {
           const response = await axios.get('https://api.github.com/repos/justbechit/rl_ladder/issues?labels=benchmark');
-          this.results = response.data.map(issue => this.parseIssue(issue));
+          data = response.data;
         } else {
           const url = this.baseUrl + 'ladder_data.json';
           console.log('Fetching from URL:', url);
-          console.log('this.baseUrl', this.baseUrl);
           const response = await fetch(url);
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
-          this.results = await response.json();
+          data = await response.json();
         }
+        this.results = data.map(issue => this.parseIssue(issue));
         this.results = this.cleanResults(this.results);
         console.log('Fetched results:', this.results);
       } catch (error) {
@@ -144,9 +145,9 @@ export default {
     },
     parseIssue(issue) {
       const result = {
-        name: issue.user.login,
-        avatar_url: issue.user.avatar_url,
-        html_url: issue.user.html_url,
+        name: issue.name || issue.user.login,
+        avatar_url: issue.avatar_url,
+        html_url: issue.html_url,
         algorithm: '',
         created_at: issue.created_at
       };
