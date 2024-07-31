@@ -33,9 +33,6 @@ function parseIssue(issue) {
     avatar_url: issue.avatar_url,
     html_url: issue.html_url,
     algorithm: '',
-    Pong: '',
-    Breakout: '',
-    SpaceInvaders: '',
     Pretrained: '',
     TrainEpisodes: '',
     EvalEpisodes: '',
@@ -46,19 +43,19 @@ function parseIssue(issue) {
   const lines = issue.body.split('\n');
   lines.forEach(line => {
     line = line.trim();
-    if (line.startsWith('Algorithm:')) {
-      result.algorithm = line.split(':')[1].trim();
-    } else if (line.startsWith('Pretrained:')) {
-      result.Pretrained = line.split(':')[1].trim();
-    } else if (line.startsWith('Train episodes:')) {
-      result.TrainEpisodes = line.split(':')[1].trim();
-    } else if (line.startsWith('Eval episodes:')) {
-      result.EvalEpisodes = line.split(':')[1].trim();
-    } else if (line.startsWith('Comment:')) {
-      result.Comment = line.split(':')[1].trim();
-    } else {
-      const [key, value] = line.split(':').map(s => s.trim());
-      if (key && value && result.hasOwnProperty(key)) {
+    const [key, value] = line.split(':').map(s => s.trim());
+    if (key && value) {
+      if (key === 'Algorithm') {
+        result.algorithm = value;
+      } else if (key === 'Pretrained') {
+        result.Pretrained = value;
+      } else if (key === 'Train episodes') {
+        result.TrainEpisodes = value;
+      } else if (key === 'Eval episodes') {
+        result.EvalEpisodes = value;
+      } else if (key === 'Comment') {
+        result.Comment = value;
+      } else {
         result[key] = value;
       }
     }
@@ -72,8 +69,10 @@ function parseIssue(issue) {
   }
 
   // Calculate average score
-  const scores = ['Pong', 'Breakout', 'SpaceInvaders'].map(game => parseFloat(result[game]));
-  result.avg_score = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  const scores = Object.entries(result)
+      .filter(([key, value]) => key !== 'avg_score' && !isNaN(parseFloat(value)))
+      .map(([_, value]) => parseFloat(value));
+  result.avg_score = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
 
   return result;
 }

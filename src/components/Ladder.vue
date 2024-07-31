@@ -69,9 +69,6 @@ export default {
       { text: 'Name', value: 'name' },
       { text: 'Algorithm', value: 'algorithm' },
       { text: 'Avg Score', value: 'avg_score' },
-      { text: 'Pong', value: 'Pong' },
-      { text: 'Breakout', value: 'Breakout' },
-      { text: 'SpaceInvaders', value: 'SpaceInvaders' },
       { text: 'Submitted At', value: 'created_at' },
       { text: 'Actions', value: 'actions', sortable: false },
     ],
@@ -82,12 +79,38 @@ export default {
   }),
   computed: {
     filteredHeaders() {
-      return this.headers.filter(header => {
-        if (['avatar', 'name', 'algorithm', 'avg_score', 'created_at', 'actions'].includes(header.value)) {
-          return true;
-        }
-        return this.results.some(result => result[header.value] !== '');
-      });
+      const dynamicHeaders = this.results.reduce((acc, result) => {
+        Object.keys(result).forEach(key => {
+          const cleanKey = this.cleanKey(key);
+          if (!['avatar', 'name', 'algorithm', 'avg_score', 'created_at', 'actions', 'avatar_url', 'html_url', 'train episodes', 'eval episodes'].includes(cleanKey.toLowerCase()) &&
+              !acc.some(header => header.value === cleanKey) &&
+              typeof result[key] === 'number') {
+            acc.push({ text: cleanKey, value: cleanKey });
+          }
+        });
+        return acc;
+      }, []);
+
+      dynamicHeaders.sort((a, b) => a.text.localeCompare(b.text));
+
+      const trainEpisodes = this.results.some(result => 'Train episodes' in result)
+          ? [{ text: 'Train Episodes', value: 'Train episodes' }]
+          : [];
+      const evalEpisodes = this.results.some(result => 'Eval episodes' in result)
+          ? [{ text: 'Eval Episodes', value: 'Eval episodes' }]
+          : [];
+
+      return [
+        this.headers[0], // Avatar
+        this.headers[1], // Name
+        this.headers[2], // Algorithm
+        this.headers[3], // Avg Score
+        ...dynamicHeaders,
+        this.headers[4], // Submitted At
+        ...trainEpisodes,
+        ...evalEpisodes,
+        this.headers[5], // Actions
+      ];
     },
     isDevelopment() {
       return process.env.NODE_ENV === 'development';
@@ -112,6 +135,7 @@ export default {
           }
           this.results = await response.json();
         }
+        this.results = this.cleanResults(this.results);
         console.log('Fetched results:', this.results);
       } catch (error) {
         console.error('Error fetching results:', error);
@@ -123,53 +147,46 @@ export default {
         avatar_url: issue.user.avatar_url,
         html_url: issue.user.html_url,
         algorithm: '',
-        Pong: '',
-        Breakout: '',
-        SpaceInvaders: '',
-        Pretrained: '',
-        TrainEpisodes: '',
-        EvalEpisodes: '',
-        Comment: '',
         created_at: issue.created_at
       };
 
       const lines = issue.body.split('\n');
       lines.forEach(line => {
         line = line.trim();
-        if (line.startsWith('Algorithm:')) {
-          result.algorithm = line.split(':')[1].trim();
-        } else if (line.startsWith('Pretrained:')) {
-          result.Pretrained = line.split(':')[1].trim();
-        } else if (line.startsWith('Train episodes:')) {
-          result.TrainEpisodes = line.split(':')[1].trim();
-        } else if (line.startsWith('Eval episodes:')) {
-          result.EvalEpisodes = line.split(':')[1].trim();
-        } else if (line.startsWith('Comment:')) {
-          result.Comment = line.split(':')[1].trim();
-        } else {
-          const [key, value] = line.split(':').map(s => s.trim());
-          if (key && value && result.hasOwnProperty(key)) {
-            result[key] = value;
+        const [key, value] = line.split(':').map(s => s.trim());
+        if (key && value) {
+          const cleanKey = this.cleanKey(key);
+          if (cleanKey.toLowerCase() === 'algorithm') {
+            result.algorithm = value;
+          } else if (!['Pretrained', 'Comment'].includes(cleanKey)) {
+            result[cleanKey] = isNaN(parseFloat(value)) ? value : parseFloat(value);
           }
         }
       });
 
-      // Remove leading dash if present
-      for (let key in result) {
-        if (typeof result[key] === 'string' && result[key].startsWith('- ')) {
-          result[key] = result[key].substring(2);
-        }
-      }
-
-      // Calculate average score
-      const scores = ['Pong', 'Breakout', 'SpaceInvaders']
-          .map(game => parseFloat(result[game]))
-          .filter(score => !isNaN(score));
-      result.avg_score = scores.length > 0
-          ? scores.reduce((sum, score) => sum + score, 0) / scores.length
-          : null;
-
       return result;
+    },
+    cleanResults(results) {
+      return results.map(result => {
+        const cleanResult = {};
+        for (const [key, value] of Object.entries(result)) {
+          const cleanKey = this.cleanKey(key);
+          cleanResult[cleanKey] = value;
+        }
+
+        // Calculate average score
+        const scores = Object.entries(cleanResult)
+            .filter(([key, value]) => key !== 'avg_score' && typeof value === 'number' &&
+                !['Train episodes', 'Eval episodes'].includes(key))
+            .map(([_, value]) => value);
+        cleanResult.avg_score = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : null;
+
+        return cleanResult;
+      });
+    },
+    cleanKey(key) {
+      // 只清除两侧的特殊字符，保留中间的内容和大小写
+      return key.replace(/^[-@.\s]+|[-@.\s]+$/g, '');
     },
     showDetails(item) {
       this.selectedItem = item;
