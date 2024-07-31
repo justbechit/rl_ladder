@@ -106,6 +106,7 @@ export default {
         } else {
           const url = this.baseUrl + 'ladder_data.json';
           console.log('Fetching from URL:', url);
+          console.log('this.baseUrl', this.baseUrl);
           const response = await fetch(url);
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
