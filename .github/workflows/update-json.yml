@@ -41,10 +41,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Add timestamp to force update
-      run: |
-        echo "Last updated: $(date)" >> public/ladder_data.json
-
     - name: Checkout gh-pages branch
       uses: actions/checkout@v2
       with:
