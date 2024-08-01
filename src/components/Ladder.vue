@@ -60,17 +60,15 @@
 </template>
 
 <script>
-import axios from 'axios';
-
 export default {
   data: () => ({
     headers: [
-      { text: 'Avatar', value: 'avatar', sortable: false },
-      { text: 'Name', value: 'name' },
-      { text: 'Algorithm', value: 'algorithm' },
-      { text: 'Avg Score', value: 'avg_score' },
-      { text: 'Submitted At', value: 'created_at' },
-      { text: 'Actions', value: 'actions', sortable: false },
+      {text: 'Avatar', value: 'avatar', sortable: false},
+      {text: 'Name', value: 'name'},
+      {text: 'Algorithm', value: 'algorithm'},
+      {text: 'Avg Score', value: 'avg_score'},
+      {text: 'Submitted At', value: 'created_at'},
+      {text: 'Actions', value: 'actions', sortable: false},
     ],
     results: [],
     dialog: false,
@@ -82,10 +80,10 @@ export default {
       const dynamicHeaders = this.results.reduce((acc, result) => {
         Object.keys(result).forEach(key => {
           const cleanKey = this.cleanKey(key);
-          if (!['avatar', 'name', 'algorithm', 'avg_score', 'created_at', 'actions', 'avatar_url', 'html_url', 'train episodes', 'eval episodes'].includes(cleanKey.toLowerCase()) &&
+          if (!['avatar', 'name', 'algorithm', 'avg_score', 'created_at', 'actions', 'avatar_url', 'html_url', 'train episodes', 'eval episodes', 'state'].includes(cleanKey.toLowerCase()) &&
               !acc.some(header => header.value === cleanKey) &&
               typeof result[key] === 'number') {
-            acc.push({ text: cleanKey, value: cleanKey });
+            acc.push({text: this.capitalizeFirstLetter(cleanKey), value: cleanKey});
           }
         });
         return acc;
@@ -94,10 +92,10 @@ export default {
       dynamicHeaders.sort((a, b) => a.text.localeCompare(b.text));
 
       const trainEpisodes = this.results.some(result => 'Train episodes' in result)
-          ? [{ text: 'Train Episodes', value: 'Train episodes' }]
+          ? [{text: 'Train Episodes', value: 'Train episodes'}]
           : [];
       const evalEpisodes = this.results.some(result => 'Eval episodes' in result)
-          ? [{ text: 'Eval Episodes', value: 'Eval episodes' }]
+          ? [{text: 'Eval Episodes', value: 'Eval episodes'}]
           : [];
 
       return [
@@ -112,9 +110,6 @@ export default {
         this.headers[5], // Actions
       ];
     },
-    isDevelopment() {
-      return process.env.NODE_ENV === 'development';
-    },
   },
   mounted() {
     this.fetchResults();
@@ -123,50 +118,20 @@ export default {
     async fetchResults() {
       try {
         console.log('Fetching results...');
-        let data;
-        if (this.isDevelopment) {
-          const response = await axios.get('https://api.github.com/repos/justbechit/rl_ladder/issues?labels=benchmark');
-          data = response.data;
-        } else {
-          const url = this.baseUrl + 'ladder_data.json';
-          console.log('Fetching from URL:', url);
-          const response = await fetch(url);
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          data = await response.json();
+        const url = this.baseUrl + 'ladder_data.json';
+        console.log('Fetching from URL:', url);
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-        this.results = data.map(issue => this.parseIssue(issue));
-        this.results = this.cleanResults(this.results);
-        console.log('Fetched results:', this.results);
+        const data = await response.json();
+        // 过滤掉已关闭的 issues
+        const openIssues = data.filter(issue => issue.state === 'open');
+        this.results = this.cleanResults(openIssues);
+        console.log(`Fetched ${this.results.length} open issues.`);
       } catch (error) {
         console.error('Error fetching results:', error);
       }
-    },
-    parseIssue(issue) {
-      const result = {
-        name: issue.name || issue.user.login,
-        avatar_url: issue.avatar_url,
-        html_url: issue.html_url,
-        algorithm: '',
-        created_at: issue.created_at
-      };
-
-      const lines = issue.body.split('\n');
-      lines.forEach(line => {
-        line = line.trim();
-        const [key, value] = line.split(':').map(s => s.trim());
-        if (key && value) {
-          const cleanKey = this.cleanKey(key);
-          if (cleanKey.toLowerCase() === 'algorithm') {
-            result.algorithm = value;
-          } else if (!['Pretrained', 'Comment'].includes(cleanKey)) {
-            result[cleanKey] = isNaN(parseFloat(value)) ? value : parseFloat(value);
-          }
-        }
-      });
-
-      return result;
     },
     cleanResults(results) {
       return results.map(result => {
@@ -176,12 +141,14 @@ export default {
           cleanResult[cleanKey] = value;
         }
 
-        // Calculate average score
-        const scores = Object.entries(cleanResult)
-            .filter(([key, value]) => key !== 'avg_score' && typeof value === 'number' &&
-                !['Train episodes', 'Eval episodes'].includes(key))
-            .map(([_, value]) => value);
-        cleanResult.avg_score = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : null;
+        // Ensure avg_score is present
+        if (!('avg_score' in cleanResult)) {
+          const scores = Object.entries(cleanResult)
+              .filter(([key, value]) => typeof value === 'number' &&
+                  !['Train episodes', 'Eval episodes'].includes(key))
+              .map(([_, value]) => value);
+          cleanResult.avg_score = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : null;
+        }
 
         return cleanResult;
       });
@@ -189,6 +156,9 @@ export default {
     cleanKey(key) {
       // 只清除两侧的特殊字符，保留中间的内容和大小写
       return key.replace(/^[-@.\s]+|[-@.\s]+$/g, '');
+    },
+    capitalizeFirstLetter(string) {
+      return string.charAt(0).toUpperCase() + string.slice(1);
     },
     showDetails(item) {
       this.selectedItem = item;
