@@ -8,9 +8,8 @@ jobs:
     if: contains(github.event.issue.labels.*.name, 'benchmark') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-      with:
-        fetch-depth: 0
+    - name: Checkout main branch
+      uses: actions/checkout@v2
     - name: Use Node.js
       uses: actions/setup-node@v2
       with:
@@ -19,9 +18,9 @@ jobs:
       id: check-lock
       run: |
         if [ -f "package-lock.json" ]; then
-          echo "::set-output name=exists::true"
+          echo "exists=true" >> $GITHUB_OUTPUT
         else
-          echo "::set-output name=exists::false"
+          echo "exists=false" >> $GITHUB_OUTPUT
         fi
     - name: Install dependencies (with package-lock.json)
       if: steps.check-lock.outputs.exists == 'true'
@@ -33,17 +32,17 @@ jobs:
       run: npm run generate-data
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Checkout gh-pages
-      uses: actions/checkout@v2
-      with:
-        ref: gh-pages
-        path: gh-pages
-    - name: Copy JSON to gh-pages root
+    - name: Add timestamp to force update
       run: |
-        cp ladder_data.json gh-pages/
-        cd gh-pages
-        git config user.name 'GitHub Action'
-        git config user.email 'action@github.com'
-        git add ladder_data.json
-        git commit -m "Update JSON data in gh-pages root" || echo "No changes to commit"
-        git push
+        echo "Last updated: $(date)" >> ladder_data.json
+    - name: Deploy JSON to gh-pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: .
+        destination_dir: .
+        keep_files: false
+        user_name: 'GitHub Action'
+        user_email: 'action@github.com'
+        commit_message: "Force update JSON data in gh-pages root"
+        force_orphan: true
