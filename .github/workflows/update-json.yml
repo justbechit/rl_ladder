@@ -19,10 +19,22 @@ jobs:
       with:
         node-version: '14'
 
-    - name: Install dependencies
+    - name: Check for package-lock.json
+      id: check-lock
       run: |
-        npm ci
-        npm install @octokit/rest
+        if [ -f "package-lock.json" ]; then
+          echo "::set-output name=exists::true"
+        else
+          echo "::set-output name=exists::false"
+        fi
+
+    - name: Install dependencies (with package-lock.json)
+      if: steps.check-lock.outputs.exists == 'true'
+      run: npm ci
+
+    - name: Install dependencies (without package-lock.json)
+      if: steps.check-lock.outputs.exists == 'false'
+      run: npm install
 
     - name: Generate JSON data
       run: npm run generate-data
