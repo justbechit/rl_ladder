@@ -1,10 +1,8 @@
 name: Update JSON
-
 on:
   issues:
-    types: [opened, edited, labeled]
+    types: [opened, edited, labeled, closed]
   workflow_dispatch:
-
 jobs:
   update-json:
     if: contains(github.event.issue.labels.*.name, 'benchmark') || github.event_name == 'workflow_dispatch'
@@ -13,12 +11,10 @@ jobs:
     - uses: actions/checkout@v2
       with:
         fetch-depth: 0
-
     - name: Use Node.js
       uses: actions/setup-node@v2
       with:
         node-version: '14'
-
     - name: Check for package-lock.json
       id: check-lock
       run: |
@@ -27,24 +23,27 @@ jobs:
         else
           echo "::set-output name=exists::false"
         fi
-
     - name: Install dependencies (with package-lock.json)
       if: steps.check-lock.outputs.exists == 'true'
       run: npm ci
-
     - name: Install dependencies (without package-lock.json)
       if: steps.check-lock.outputs.exists == 'false'
       run: npm install
-
     - name: Generate JSON data
       run: npm run generate-data
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Commit and push if changed
+    - name: Checkout gh-pages
+      uses: actions/checkout@v2
+      with:
+        ref: gh-pages
+        path: gh-pages
+    - name: Copy JSON to gh-pages root
       run: |
-        git config --global user.name 'GitHub Action'
-        git config --global user.email 'action@github.com'
-        git add -A
-        git commit -m "Update JSON data" || exit 0
+        cp ladder_data.json gh-pages/
+        cd gh-pages
+        git config user.name 'GitHub Action'
+        git config user.email 'action@github.com'
+        git add ladder_data.json
+        git commit -m "Update JSON data in gh-pages root" || echo "No changes to commit"
         git push
