@@ -3,43 +3,59 @@ on:
   issues:
     types: [opened, edited, labeled]
   workflow_dispatch:
+
 jobs:
   update-ladder:
     if: contains(github.event.issue.labels.*.name, 'benchmark') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout main branch
+      uses: actions/checkout@v2
       with:
         fetch-depth: 0
+
     - name: Use Node.js
       uses: actions/setup-node@v2
       with:
         node-version: '14'
+
     - name: Check for package-lock.json
       id: check-lock
       run: |
         if [ -f "package-lock.json" ]; then
-          echo "::set-output name=exists::true"
+          echo "exists=true" >> $GITHUB_OUTPUT
         else
-          echo "::set-output name=exists::false"
+          echo "exists=false" >> $GITHUB_OUTPUT
         fi
+
     - name: Install dependencies (with package-lock.json)
       if: steps.check-lock.outputs.exists == 'true'
       run: npm ci
+
     - name: Install dependencies (without package-lock.json)
       if: steps.check-lock.outputs.exists == 'false'
       run: npm install
+
     - name: Generate JSON data
       run: npm run generate-data
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Build
       run: npm run build
-    - name: Copy JSON to dist
-      run: cp ladder_data.json dist/
+
+    - name: Ensure JSON is in build directory
+      run: |
+        if [ ! -f "dist/ladder_data.json" ]; then
+          cp public/ladder_data.json dist/
+        fi
+
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./dist
-        force_orphan: true
+        keep_files: false
+        user_name: 'GitHub Action'
+        user_email: 'action@github.com'
+        commit_message: "Update Ladder website and JSON data"
